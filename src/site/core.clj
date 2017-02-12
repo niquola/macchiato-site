@@ -95,7 +95,7 @@
       {:padding "80px 0 100px"
        :margin "0 auto"
        :text-align "center"
-       :background "url(/imgs/bg.png) #583426"
+       :background (str  "url(" (es/href opts "/imgs/bg.png") ") #583426")
        :color "white"}
       [:.logo {:height "105px"
                :vertical-align "top"
