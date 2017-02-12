@@ -1,0 +1,9 @@
+-   href: /getting-started
+    text: Getting Started
+-   href: /docs/documentation
+    text: Documentation
+-   href: docs/api
+    text: API
+-   href: https://github.com/macchiato-framework
+    icon: github
+    text: Source Code

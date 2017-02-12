@@ -1,0 +1,13 @@
+brand: Macchiato
+moto:
+  header: MACCHIATO
+  subheader: ClojureScript arrives on the server
+  text: >-
+    Macchiato provides a stack modeled on Ring based around the
+    existing Node ecosystem, and a development environment similar to Clojure on the JVM.
+
+footer:
+  header: "MACCHIATO"
+  text: >-
+    ClojureScript arrives on the server
+
