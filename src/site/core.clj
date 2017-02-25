@@ -4,6 +4,7 @@
    [esthatic.data :as esd]
    [esthatic.hiccup :as esh]
    [clojure.string :as str]
+   [clj-yaml.core :as yaml]
    [clojure.java.io :as io]))
 
 (defn footer [{data :data :as opts}]
@@ -22,7 +23,7 @@
    [:div.footer-container
     [:h2 [:img.logo {:src (es/href opts "/imgs/logo.png")}] [:> :brand]]
     [:h4 [:> :moto]]
-    [:span.by "by @niquola"]]])
+    ]])
 
 (def style
   [:body {:font-family "'Exo 2'"
@@ -92,10 +93,16 @@
              :color "white"
              :border-bottom "1px solid #eee"}
      [:#coffee
-      {:padding "80px 0 100px"
+      {:padding "180px 0 200px"
        :margin "0 auto"
        :text-align "center"
-       :background (str  "url(" (es/href opts "/imgs/bg.png") ") #583426")
+       :background-image (str  "url(" (es/href opts "/imgs/bg.png") ")")
+       :height "500px"
+       :background-color "#583426"
+       :background-attachment "fixed"
+       ;; :background-position "center"
+       :background-repeat "repeat"
+       :background-size "initial"
        :color "white"}
       [:.logo {:height "105px"
                :vertical-align "top"
@@ -113,7 +120,7 @@
     [:h1
      [:img.logo {:src (es/href opts "/imgs/logo.png")}]
      [:span.text
-      [:span.brand "MOCCHIATO"]
+      [:span.brand "MACCHIATO"]
       [:span.moto "ClojureScript arrives on server"]]]]])
 
 (defn icon [nm]
@@ -135,37 +142,56 @@
          [:p text]])]]
     [:div.block [:md/doc "index.md"]]]])
 
-(defn $doc [{{id :doc-id} :params data :data :as opts}]
-  [:div.container
+
+(defn $doc [{{id :doc-id} :params data :data uri :uri :as opts}]
+  [:div.container-fluid
    [:css
-    [:.docs-nav
-     {:margin-top "20px"
-      :border-left "1px solid #ddd"}
+    [:.docs-nav 
      [:li
+      {:border-left "4px solid #eee"}
       [:a {:color "#888"
-           :padding "5px 20px"
-           }]
-      ]
-     ]
-    ]
-   
+           :padding "5px 20px"}]
+      [:&.active {:border-left "4px solid #777"}
+       [:a {:color "#333"}]]]]]
    [:.row 
-    [:.col-md-9
-     [:md/doc (str "docs/" id ".md")]]
-    [:.col-md-3.docs-nav
+    [:.col-md-2.docs-nav
      [:h3 "Documentation"]
      [:ul.nav
-      (for [f (:files data)]
-        [:li [:a {:href (:name f)} (:name f)]])]]]])
+      (for [[bn f] (:files data)]
+        [:li {:class (when (str/ends-with? uri bn) "active")}
+         [:a {:href bn } (or (:title f) bn)]])]]
+    [:.col-md-9
+     [:md/md (get-in data [:files id :content])]]]])
+
+(def meta-start-regex  #"^---")
+
+(defn read-file-meta [x]
+  (with-open [rdr (io/reader x)]
+    (let [lines (line-seq rdr)]
+      (when (re-find meta-start-regex (first lines))
+        (loop [acc []
+               [line & lines] (rest lines)]
+          (when line
+            (if (re-find meta-start-regex line)
+              (merge (or (yaml/parse-string (str/join "\n" acc)) {})
+                     {:content (str/join "\n" lines)})
+              (recur (conj acc line) lines))))))))
 
 (defn with-ls [h]
   (fn [req]
-    (let [files (mapv (fn [x]
-                        {:name (.getName x)
-                         :path (.getPath x)})
-                      (file-seq (io/file (io/resource "docs"))))]
-      (println files)
-      (h (assoc-in req [:data :files] files)))))
+    (->>
+     (file-seq (io/file (io/resource "docs")))
+     (filter #(.isFile %))
+     (mapv (fn [x]
+             (merge
+              {:name (.getName x)
+               :basename (str/replace (.getName x) #"\.md" "") 
+               :path (.getPath x)}
+              (or (read-file-meta (.getPath x)) {}))))
+     (reduce (fn [acc f]
+               (assoc acc (:basename f) f)) {})
+     (assoc-in req [:data :files])
+     (h))))
 
 
 
@@ -202,7 +228,7 @@
   (require '[clojure.java.shell :as sh])
 
   (defn publish [config]
-    (println (sh/sh "bash" "-c" "cd dist && git init && git add .  && git commit -m 'build' && git remote add origin https://github.com/niquola/macchiato-site.git && git checkout -b gh-pages && git push -f origin gh-pages"))
+    (println (sh/sh "bash" "-c" "cd dist && git init && git add -A  && git commit -a -m 'build' && git remote add origin https://github.com/niquola/macchiato-site.git && git checkout -b gh-pages && git push -f origin gh-pages"))
     )
 
   (publish {})

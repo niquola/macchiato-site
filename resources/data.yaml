@@ -1,7 +1,7 @@
-brand: Mocchiato
+brand: Macchiato
 moto: ClojureScript arrives on server
 menu:
-  brand: Mocchiato
+  brand: Macchiato
   items:
   -   href: /docs/getting-started
       text: Getting Started
