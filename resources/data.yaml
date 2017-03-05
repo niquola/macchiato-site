@@ -7,7 +7,7 @@ menu:
       text: Getting Started
   -   href: /docs/documentation
       text: Documentation
-  -   href: docs/api
+  -   href: /api/core/index.html
       text: API
   -   href: https://github.com/macchiato-framework
       icon: github

@@ -5,7 +5,9 @@
    [esthatic.hiccup :as esh]
    [clojure.string :as str]
    [clj-yaml.core :as yaml]
-   [clojure.java.io :as io]))
+   [clojure.java.shell :as sh]
+   [clojure.java.io :as io]
+   [clojure.string :as s]))
 
 (defn footer [{data :data :as opts}]
   [:div#footer
@@ -77,8 +79,7 @@
      [:body
       [:bs/menu {:source [:menu]}]
       (h opts)
-      (footer opts)
-      ]]))
+      (footer opts)]]))
 
 (defn doc-layout [h]
   (fn [opts]
@@ -157,7 +158,7 @@
     [:.col-md-2.docs-nav
      [:h3 "Documentation"]
      [:ul.nav
-      (for [[bn f] (:files data)]
+      (for [[bn f] (sort-by (fn [[k v]] (:page-index v)) (:files data))]
         [:li {:class (when (str/ends-with? uri bn) "active")}
          [:a {:href bn } (or (:title f) bn)]])]]
     [:.col-md-9
@@ -177,19 +178,22 @@
                      {:content (str/join "\n" lines)})
               (recur (conj acc line) lines))))))))
 
+(defn read-files [dir]
+  (->>
+   (file-seq (io/file (io/resource dir)))
+   (filter #(.isFile %))
+   (mapv (fn [x]
+           (merge
+            {:name (.getName x)
+             :basename (str/replace (.getName x) #"\.md" "") 
+             :path (.getPath x)}
+            (or (read-file-meta (.getPath x)) {}))))
+   (reduce (fn [acc f] (assoc acc (:basename f) f)) {})))
+
 (defn with-ls [h]
   (fn [req]
     (->>
-     (file-seq (io/file (io/resource "docs")))
-     (filter #(.isFile %))
-     (mapv (fn [x]
-             (merge
-              {:name (.getName x)
-               :basename (str/replace (.getName x) #"\.md" "") 
-               :path (.getPath x)}
-              (or (read-file-meta (.getPath x)) {}))))
-     (reduce (fn [acc f]
-               (assoc acc (:basename f) f)) {})
+     (read-files "docs")
      (assoc-in req [:data :files])
      (h))))
 
@@ -204,13 +208,14 @@
    "index" {:. #'$index}
    "docs" {:es/mw [#'with-ls]
            :es/params {:invert-menu true}
-           :doc-id (constantly ["getting-started" "documentation"])
+           :doc-id (fn [] (mapv :basename (vals (read-files "docs"))))
            [:doc-id]
            {:. #'$doc}}
    })
 
 (def config
   {:port 8888
+   :repo "https://github.com/niquola/macchiato-framework.github.io"
    :es/hiccup [#'esh/bootstrap-hiccup
                #'esh/yaml-hiccup
                #'esh/google-hiccup
@@ -221,15 +226,32 @@
 
 ;; (defn -main [] (es/generate config))
 
+(defn start []
+  (es/restart config))
+
+(defn generate [config]
+  (let [prefix (or (:prefix config) (System/getenv "SITE_PREFIX") "/macchiato-site")]
+    (es/generate (assoc config :es/prefix prefix))))
+
+(defn publish []
+  (println (sh/sh "bash" "-c" "rm -rf dist"))
+  (println  (sh/sh "bash" "-c" (str "git clone " (:repo config) " dist")))
+  (generate (merge config {:prefix ""})))
+
+(defn local-publish []
+  (println (sh/sh "bash" "-c" "rm -rf dist"))
+  (println  (sh/sh "bash" "-c" (str "git clone " (:repo config) " dist")))
+  (println (sh/sh "bash" "-c" "rm -rf dist/.git"))
+  (generate (merge config {:prefix "/macchiato-site"}))
+  (println (sh/sh "bash" "-c" "cd dist && git init && git add -A  && git commit -a -m 'build' && git remote add origin https://github.com/niquola/macchiato-site.git && git checkout -b gh-pages && git push -f origin gh-pages")))
 
 (comment
+  (println (sh/sh "bash" "-c" "cd dist && git init && git add -A  && git commit -a -m 'build' && git remote add origin https://github.com/niquola/macchiato-site.git && git checkout -b gh-pages && git push -f origin gh-pages"))
   (es/restart config)
-  (es/generate (assoc config :es/prefix "/macchiato-site"))
-  (require '[clojure.java.shell :as sh])
 
-  (defn publish [config]
-    (println (sh/sh "bash" "-c" "cd dist && git init && git add -A  && git commit -a -m 'build' && git remote add origin https://github.com/niquola/macchiato-site.git && git checkout -b gh-pages && git push -f origin gh-pages"))
-    )
-
-  (publish {})
+  (generate (merge config {:prefix "/"}))
+  (publish)
+  (local-publish)
   )
+
+  
